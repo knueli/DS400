@@ -85,13 +85,39 @@ df <- df %>%
 2.  Do some exploratory data analysis
 3.  Determine the prior probability that someone has diabetes (DIQ010)
     -   P(B)
-4.  Determine the prior probability that someone eats tuna (DRD370B)
+
+```{r}
+df %>% 
+  tabyl(DIQ010)
+```
+
+2.  Determine the prior probability that someone eats tuna (DRD370B)
     -   P(A)
-5.  Determine the likelihood of eating tuna and having diabetes
+
+```{r}
+df %>% 
+  tabyl(DRD370B)
+```
+
+2.  Determine the likelihood of eating tuna and having diabetes
     -   L(B\|A)
-6.  Determine posterior probability via bayes theorem
+
+```{r}
+df %>% 
+  tabyl(DRD370B, DIQ010) %>%
+  adorn_percentages ("col")
+```
+
+2.  Determine posterior probability via bayes theorem
     -   P(B\|A)
-7.  What other questions can we ask of this data?
+
+```{r}
+df %>% 
+  tabyl(DRD370B, DIQ010) %>%
+  adorn_percentages ("col")
+```
+
+2.  What other questions can we ask of this data?
 
 Bayes Theorem
 
@@ -170,3 +196,49 @@ ggplot(nhanes_data, aes(x = RIDAGEYR, fill = DIQ010)) + geom_density(alpha = 0.5
 B \<- has diabetes
 
 A \<- old, over 40
+
+### Bayes Theorem
+
+#### P(B)
+
+The probability that a person has diabetes
+
+```{r}
+nhanes_data %>% 
+  tabyl(DIQ010)
+```
+
+```{r}
+prior_probability_has_diabetes <- 0.13
+```
+
+#### L(B\|A) = P(A\|B)
+
+```{r}
+nhanes_data %>% 
+  tabyl(age_bracket, DIQ010) %>%
+  adorn_percentages ("col")
+```
+
+```{r}
+likelihood_old_given_diabetes <- 0.96
+```
+
+#### P(A)
+
+```{r}
+nhanes_data %>% 
+  tabyl(age_bracket)
+```
+
+```{r}
+probability_old <- 0.53
+```
+
+#### P(B\|A)
+
+```{r}
+posterior_probability <- (prior_probability_has_diabetes * likelihood_old_given_diabetes) / probability_old
+
+posterior_probability
+```
