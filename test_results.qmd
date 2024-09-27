@@ -147,6 +147,13 @@ $$
 P(\text{have disease} \mid \text{positive second test}) = \frac{P(\text{have disease after first positive}) \cdot P(\text{positive second test} \mid \text{have disease})}{P(\text{positive second test})}
 $$
 
+Thoughts:
+
+\
+From the video, to calculate the probability of having the disease after a second positive test result, we need to update our initial probability from the first positive test. We would use the result from the first test as the new starting point, treating it as a new prior probability. Then, we apply Bayes' theorem again using this updated prior along with the likelihood of testing positive a second time. I think this should give us a higher probability of actually having the disease since two positive results would logically increase our confidence in the diagnosis.
+
+Practice:
+
 ```{r}
 total_patients <- nrow(patients)
 probability_positive_second_test <- (probability_test_result_positive * (1 - probability_positive_test_result_given_disease)) + (1 * probability_positive_test_result_given_disease)
@@ -169,4 +176,198 @@ probability_positive_second_test
 
 ```{r}
 (probability_given_positive_first * probability_positive_test_result_given_disease) / probability_positive_second_test
+```
+
+#### In Class:
+
+#### Update P(B)
+
+```{r}
+# First test posterior probability
+updated_probability_having_disease <- (probability_positive_test_result_given_disease * probability_has_disease) / probability_test_result_positive
+
+updated_probability_having_disease
+```
+
+#### Updated P(A)
+
+Lets think through this:
+
+#### To find P(A) **before** the second positive test, we simply used:
+
+```{r}
+patients %>% 
+  tabyl (test_result)
+```
+
+This indicated that the probability of a positive test is very low (0.0112%)
+
+But now, we need to update P(A) as the probability of a second positive test
+
+[In the text we see](https://www.bayesrulesbook.com/chapter-2#building-a-bayesian-model-for-events:~:text=)
+
+P(A)=P(A∩B)+P(A∩Bc) = P(A\|B)P(B)+P(A\|Bc)P(Bc) 😨 but we got this 😎
+
+-   P(True Positive) \* P(having disease) + P(False Positive) \* P(having disease)
+
+First lets test this based on the first test result and see if we get the same 0.0112% as above
+
+-   P(A\|B)P(B)+P(A\|Bc)P(Bc)
+
+    -   P(A\|B)P(B)
+
+```{r}
+probability_positive_test_result_given_disease * probability_has_disease
+```
+
+-   P(A\|B)P(B) = 0.001
+-   P(A\|Bc)P(Bc)
+
+```{r}
+patients %>% 
+  tabyl(has_disease, test_result) %>% 
+  adorn_percentages("row")
+```
+
+-   P(A\|Bc) = 0.01021
+
+```{r}
+patients %>% 
+  tabyl(test_result)
+```
+
+-   P(Bc) = 0.9888
+
+```{r}
+0.01021 * 0.9888
+```
+
+-   P(A\|Bc)P(Bc) = 0.01009565
+
+P(A\|B)P(B)+P(A\|Bc)P(Bc)
+
+```{r}
+0.01009565 + 0.001
+```
+
+P(A)=P(A∩B)+P(A∩Bc) = P(A\|B)P(B)+P(A\|Bc)P(Bc) = 0.0111
+
+-   Very close to our 0.0112% from the tabyl function
+
+#### To find P(A) for the second positive test - We need some changes
+
+P(A)=P(A∩B)+P(A∩Bc) = P(A\|B)P(B)+P(A\|Bc)P(Bc) 😨 but we got this 😎
+
+-   P(A\|B)P(B) = 0.089
+
+```{r}
+probability_positive_test_result_given_disease * updated_probability_having_disease
+```
+
+-   P(A\|Bc)P(Bc)
+
+    -   P(A\|Bc) Stays the same
+
+```{r}
+patients %>% 
+  tabyl(has_disease, test_result) %>% 
+  adorn_percentages("row")
+```
+
+-   P(A\|Bc) = 0.01021
+
+    -   P(Bc) changes
+
+```{r}
+1 - updated_probability_having_disease
+```
+
+-   P(A\|Bc)P(Bc) = 0.009298393
+
+```{r}
+0.01021 * 0.9107143
+```
+
+P(A\|B)P(B)+P(A\|Bc)P(Bc) 😨
+
+```{r}
+0.08928571 + 0.009298393
+```
+
+#### Bayes Theorem
+
+```{r}
+(updated_probability_having_disease * probability_positive_test_result_given_disease) / 0.0986
+```
+
+#### What if we had data for the second test results?
+
+```{r}
+set.seed(70) # For reproducibility
+
+# Parameters
+n_patients <- 10000  # Total population size
+n_diseased <- 10     # Number of patients with the disease
+sensitivity <- 0.99  # True positive rate (sensitivity)
+false_positive_rate <- 0.01  # False positive rate
+second_test_sensitivity <- 0.90  # Second test: 90% of positives have the disease
+
+# Step 1: Create the DataFrame with patients
+patients_updated <- data.frame(
+  patient_id = 1:n_patients,
+  has_disease = c(rep(1, n_diseased), rep(0, n_patients - n_diseased))  # 10 with the disease, rest without
+)
+
+# Shuffle the DataFrame to randomize patient order
+patients_updated <- patients_updated[sample(n_patients), ]
+
+# Step 2: Simulate the first test results based on disease status
+patients_updated <- patients_updated %>%
+  mutate(
+    # First test result: positive if the person has the disease and the test is sensitive,
+    # or if they don't have the disease but it's a false positive
+    test_result = case_when(
+      has_disease == 1 & rbinom(n(), 1, sensitivity) == 1 ~ "positive",
+      has_disease == 0 & rbinom(n(), 1, false_positive_rate) == 1 ~ "positive",
+      TRUE ~ "negative"
+    )
+  )
+
+# Step 3: Simulate the second test results based on the first test result
+patients_updated <- patients_updated %>%
+  mutate(
+    # Second test result logic:
+    second_test_result = case_when(
+      # If they tested positive in the first test and have the disease
+      test_result == "positive" & has_disease == 1 ~ ifelse(rbinom(n(), 1, second_test_sensitivity) == 1, "positive", "negative"),
+      
+      # If they tested positive in the first test but don't have the disease (false positive)
+      test_result == "positive" & has_disease == 0 ~ ifelse(rbinom(n(), 1, false_positive_rate) == 1, "positive", "negative"),
+      
+      # If they tested negative in the first test, they test negative in the second
+      TRUE ~ "negative"
+    )
+  )
+```
+
+```{r}
+patients_updated %>% 
+  tabyl(has_disease, second_test_result) %>% 
+  adorn_percentages ("col")
+```
+
+```{r}
+patients_updated_longer <- patients_updated %>% 
+  pivot_longer(cols = c("test_result", "second_test_result"), 
+               names_to = "test",
+               values_to = "result")
+```
+
+```{r}
+patients_updated_longer$has_disease <- as.factor(patients_updated_longer$has_disease)
+```
+
+```{r}
+stacked <- ggplot(patients_updated_longer, aes(x = result, fill = has_disease)) + geom_bar() + facet_wrap(~test)
+ggplotly(stacked)
 ```
